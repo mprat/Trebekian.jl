@@ -1,41 +1,47 @@
 #=
-list -> sum of list
-* easy to generate data
-* (should be) easy to train
-* (should be) easy to test
+This snippet is a simple get-to-learn-RNNs implementation that trains a single-layer RNN
+to take a list of numbers of arbitrary length and output it's sum.
+
+This was chosen because:
+* It is easy to generate data
+* It is easy to test
+* It (should be) easy to train
+* It is easy to evaluate visually
 =#
 
 using Flux: @epochs
-using NNlib
 
 num_samples = 1000
 num_epochs = 50
 
 function generate_data(num_samples)
-	train_data = (v -> Float32.(v)).([rand(1.0:10.0, 3) for i in 1:num_samples])
+	# we just generate data of variable length from 2 to 7 elements with each element being
+	# a float between 1 and 10, to keep it simple!
+	train_data = [rand(1.0:10.0, rand(2:7)) for i in 1:num_samples]
 	train_labels = (v -> sum(v)).(train_data)
 
+	# why bother generating new data when you can just multiply your
+	# test data! No really, in real models you never want to do this
+	# because that means you're evaluating on your training data which
+	# is a big no-no. For learning purposes, it works great!
 	test_data = 2 .* train_data
-	test_labels = (v -> sum(v)).(test_data)
+	test_labels = 2 .* train_labels
 
 	train_data, train_labels, test_data, test_labels
 end
 
 train_data, train_labels, test_data, test_labels = generate_data(num_samples)
-# we use RELU activations because tanh limits to the range -1,1 which is NOT
-# what you want out of a sum
-# simple_rnn = Chain(Flux.RNN(3, 3, NNlib.relu), Flux.RNN(3, 1, NNlib.relu))
-simple_rnn = Flux.RNN(1, 1, NNlib.leakyrelu)
+# we use no activation because tanh limits to the range -1,1 which is NOT
+# what you want out of a summation function
+simple_rnn = Flux.RNN(1, 1, (x -> x))
 
 function eval_model(x)
-	simple_rnn.(x)[end]
+	out = simple_rnn.(x)[end]
+	Flux.reset!(simple_rnn)
+	out
 end
 
-function loss(x, y)
-  l = abs(sum((eval_model(x) .- y)))
-  Flux.reset!(simple_rnn)
-  return l
-end
+loss(x, y) = abs(sum((eval_model(x) .- y)))
 
 ps = Flux.params(simple_rnn)
 
